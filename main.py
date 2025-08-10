@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from docling.document_converter import DocumentConverter
 from docling.chunking import HybridChunker
-# --- CORRECTED: Import the real class name ---
 from docling.datamodel.document import InputDocument
+import tempfile
+import pathlib
 
 # --- SETUP ---
 app = FastAPI()
@@ -30,13 +31,24 @@ def process_url_and_get_markdown(request: UrlRequest):
 
 @app.post("/chunk-markdown/")
 def chunk_markdown_text(request: MarkdownRequest):
+    """
+    Receives markdown text, saves it to a temporary file, converts it to a rich
+    docling object, chunks it, and returns the chunks.
+    """
     print(f"Chunking markdown text of length: {len(request.markdown_text)}")
     
-    # --- CORRECTED: Use the real class name here ---
-    doc_to_chunk = InputDocument.from_text(request.markdown_text)
-    
-    chunks_iterator = chunker.chunk(doc_to_chunk)
-    chunks_list = list(chunks_iterator)
-    chunk_texts = [chunk.text for chunk in chunks_list]
+    # Create a temporary file to hold the markdown text
+    with tempfile.NamedTemporaryFile(mode='w+', delete=True, suffix=".md") as temp_file:
+        temp_file.write(request.markdown_text)
+        temp_file.flush() # Ensure all data is written to the file before reading
+
+        # Convert the temporary file just like a normal document.
+        # This creates the rich, structured object the chunker needs.
+        result = converter.convert(pathlib.Path(temp_file.name))
+        
+        # Now, the rest of the logic will work perfectly
+        chunks_iterator = chunker.chunk(result.document)
+        chunks_list = list(chunks_iterator)
+        chunk_texts = [chunk.text for chunk in chunks_list]
     
     return {"chunk_count": len(chunk_texts), "chunks": chunk_texts}
