@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from docling.document_converter import DocumentConverter
 from docling.chunking import HybridChunker
-from docling.datamodel import DoclingDoc
+from docling.datamodel.document import DoclingDoc
 
 # --- SETUP ---
 # Create the FastAPI app instance
