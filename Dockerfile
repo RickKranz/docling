@@ -1,29 +1,23 @@
-FROM python:3.11-slim-bookworm
+# Dockerfile
 
-ENV GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
+# 1. Start with an official Python base image
+FROM python:3.12-slim
 
-RUN apt-get update \
-    && apt-get install -y libgl1 libglib2.0-0 curl wget git procps \
-    && rm -rf /var/lib/apt/lists/*
+# 2. Set the working directory inside the container
+WORKDIR /app
 
-# This will install torch with *only* cpu support
-# Remove the --extra-index-url part if you want to install all the gpu requirements
-# For more details in the different torch distribution visit https://pytorch.org/.
-RUN pip install --no-cache-dir docling --extra-index-url https://download.pytorch.org/whl/cpu
+# 3. Copy all your project files into the container
+COPY . .
 
-ENV HF_HOME=/tmp/
-ENV TORCH_HOME=/tmp/
+# 4. Run the Dockling installation using the method we know works
+RUN pip install -e .
 
-COPY docs/examples/minimal.py /root/minimal.py
+# 5. Install the web server components
+RUN pip install fastapi uvicorn[standard]
 
-RUN docling-tools models download
+# 6. Expose the port the server will run on
+EXPOSE 8080
 
-# On container environments, always set a thread budget to avoid undesired thread congestion.
-ENV OMP_NUM_THREADS=4
-
-# On container shell:
-# > cd /root/
-# > python minimal.py
-
-# Running as `docker run -e DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models` will use the
-# model weights included in the container image.
+# 7. Define the command to run when the container starts
+# This tells uvicorn to run the 'app' object from the 'main.py' file
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
