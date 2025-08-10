@@ -1,46 +1,60 @@
+# main.py
+
+from fastapi import FastAPI
+from pydantic import BaseModel
 from docling.document_converter import DocumentConverter
-import time 
-
 from docling.chunking import HybridChunker
+from docling.datamodel import DoclingDoc
 
-print("--> Script started.")
+# --- SETUP ---
+# Create the FastAPI app instance
+app = FastAPI()
 
-source = input("--> Please enter the full URL or local path to your PDF file: ")
-
-print(f"--> Received source: {source}")
-print("--> Step 1: Initializing the converter...")
-
+# Initialize the tools once when the server starts
+# This is efficient because they are loaded into memory only one time.
 converter = DocumentConverter()
-
-print("--> Step 2: Starting conversion. This is the slow part, please wait...")
-
-start_time = time.time()
-result = converter.convert(source) 
-end_time = time.time()
-
-processing_time = end_time - start_time
-
-print(f"--> Step 3: Conversion complete! It took {processing_time:.2f} seconds.")
-
-# --- NEW: Print the full document before chunking ---
-print("\n--- Full Converted Document (Markdown) ---")
-print(result.document.export_to_markdown())
-print("-" * 40 + "\n")
-
-# ----------------------------------------------------------------------
-# --- CHUNKING SECTION ---
-# ----------------------------------------------------------------------
-
-print("\n--> Step 4: Chunking the document with the Hybrid Chunker...")
-
 chunker = HybridChunker()
 
-chunks = list(chunker.chunk(result.document))
+# --- DATA MODELS ---
+# Define the structure of the data your API will expect
+class UrlRequest(BaseModel):
+    source_url: str
 
-print(f"--> Step 5: Document successfully split into {len(chunks)} chunks.")
-print("\n--- Displaying Chunks ---")
+class MarkdownRequest(BaseModel):
+    markdown_text: str
 
-for i, chunk in enumerate(chunks):
-    print(f"--- Chunk {i+1} (Size: {len(chunk.text)} chars) ---")
-    print(chunk.text)
-    print("-" * 20 + "\n")
+# --- API ENDPOINTS ---
+
+# This is Endpoint #1
+@app.post("/process-url/")
+def process_url_and_get_markdown(request: UrlRequest):
+    """
+    Receives a URL, converts the document, and returns the full markdown.
+    """
+    print(f"Processing URL: {request.source_url}")
+    # Run the conversion
+    result = converter.convert(request.source_url)
+    markdown_output = result.document.export_to_markdown()
+    
+    # Return the result in a JSON format
+    return {"source_url": request.source_url, "markdown_content": markdown_output}
+
+# This is Endpoint #2
+@app.post("/chunk-markdown/")
+def chunk_markdown_text(request: MarkdownRequest):
+    """
+    Receives markdown text, chunks it, and returns the chunks.
+    """
+    print(f"Chunking markdown text of length: {len(request.markdown_text)}")
+    # Dockling's chunker needs a DoclingDoc object, so we create one from the text
+    doc_to_chunk = DoclingDoc.from_text(request.markdown_text)
+    
+    # Run the chunking
+    chunks_iterator = chunker.chunk(doc_to_chunk)
+    chunks_list = list(chunks_iterator) # Convert iterator to a list
+    
+    # Extract just the text from each chunk object
+    chunk_texts = [chunk.text for chunk in chunks_list]
+    
+    # Return the result in a JSON format
+    return {"chunk_count": len(chunk_texts), "chunks": chunk_texts}
