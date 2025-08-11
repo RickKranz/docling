@@ -1,17 +1,24 @@
-# main.py
+# main.py - Final Working Version
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from docling.document_converter import DocumentConverter
-from docling.chunking import HybridChunker
-from docling.datamodel.document import InputDocument
 import tempfile
 import pathlib
+
+# --- IMPORTS WE HAVE CONFIRMED ARE CORRECT ---
+from docling.document_converter import DocumentConverter
+from docling.chunking import HybridChunker
+from docling.datamodel.document import DoclingDocument
+
 
 # --- SETUP ---
 app = FastAPI()
 converter = DocumentConverter()
-chunker = HybridChunker()
+
+# This is the final, correct chunker setup. Since merge_peers=True is the default,
+# you can simply write chunker = HybridChunker(). We'll write it explicitly for clarity.
+chunker = HybridChunker(merge_peers=True)
+
 
 # --- DATA MODELS ---
 class UrlRequest(BaseModel):
@@ -19,6 +26,7 @@ class UrlRequest(BaseModel):
 
 class MarkdownRequest(BaseModel):
     markdown_text: str
+
 
 # --- API ENDPOINTS ---
 
@@ -37,16 +45,12 @@ def chunk_markdown_text(request: MarkdownRequest):
     """
     print(f"Chunking markdown text of length: {len(request.markdown_text)}")
     
-    # Create a temporary file to hold the markdown text
     with tempfile.NamedTemporaryFile(mode='w+', delete=True, suffix=".md") as temp_file:
         temp_file.write(request.markdown_text)
-        temp_file.flush() # Ensure all data is written to the file before reading
+        temp_file.flush()
 
-        # Convert the temporary file just like a normal document.
-        # This creates the rich, structured object the chunker needs.
         result = converter.convert(pathlib.Path(temp_file.name))
         
-        # Now, the rest of the logic will work perfectly
         chunks_iterator = chunker.chunk(result.document)
         chunks_list = list(chunks_iterator)
         chunk_texts = [chunk.text for chunk in chunks_list]
