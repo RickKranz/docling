@@ -344,7 +344,11 @@ class MsPowerpointDocumentBackend(DeclarativeDocumentBackend, PaginatedDocumentB
                     self.handle_tables(shape, parent_slide, slide_ind, doc, slide_size)
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                     # Handle Pictures
-                    if hasattr(shape, "image"):
+                    try:
+                        has_image = hasattr(shape, "image")
+                    except ValueError:  # picture with no embedded image (e.g. SVG without PNG backup)
+                        has_image = False
+                    if has_image:
                         self.handle_pictures(
                             shape, parent_slide, slide_ind, doc, slide_size
                         )
